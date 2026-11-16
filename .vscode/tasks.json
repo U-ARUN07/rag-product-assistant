@@ -4,8 +4,8 @@
     {
       "label": "Run Full System (FastAPI + Streamlit)",
       "type": "shell",
-      "command": "cmd.exe",
-      "args": ["/c", "run.bat"],
+      "command": "python",
+      "args": ["run.py"],
       "group": {
         "kind": "build",
         "isDefault": true
@@ -13,7 +13,7 @@
       "presentation": {
         "echo": true,
         "reveal": "always",
-        "focus": false,
+        "focus": true,
         "panel": "shared",
         "showReuseMessage": false,
         "clear": false
