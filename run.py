@@ -7,14 +7,27 @@ Usage:
 """
 
 import sys
+import os
 import time
 import subprocess
 import webbrowser
+import urllib.request
 from pathlib import Path
 
 # Add project root to path
 BASE_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(BASE_DIR))
+
+# Ensure Streamlit does not prompt for email
+os.environ["STREAMLIT_SERVER_HEADLESS"] = "true"
+os.environ["STREAMLIT_BROWSER_GATHER_USAGE_STATS"] = "false"
+
+def is_server_ready(url: str, timeout: float = 0.5) -> bool:
+    try:
+        req = urllib.request.urlopen(url, timeout=timeout)
+        return req.getcode() in (200, 404)
+    except Exception:
+        return False
 
 def main():
     print("=" * 65)
@@ -41,28 +54,46 @@ def main():
     ]
     backend_proc = subprocess.Popen(backend_cmd)
 
-    # Allow backend server 2 seconds to initialize
-    time.sleep(2)
+    # Wait for backend server to become ready
+    for _ in range(10):
+        if is_server_ready("http://127.0.0.1:8000/health"):
+            break
+        time.sleep(0.5)
+    print("FastAPI Backend is running and healthy!")
 
     # 3. Launch Streamlit Frontend
-    print("[3/3] Starting Streamlit chatbot interface on http://localhost:8501 ...")
+    print("\n[3/3] Starting Streamlit chatbot interface on http://localhost:8501 ...")
     streamlit_cmd = [
         sys.executable, "-m", "streamlit",
         "run", "frontend/streamlit_app.py",
-        "--server.port", "8501"
+        "--server.headless=true",
+        "--server.port=8501",
+        "--browser.gatherUsageStats=false"
     ]
+    frontend_proc = subprocess.Popen(streamlit_cmd)
+
+    # Wait for Streamlit server to be ready before opening browser
+    print("Waiting for Streamlit web interface to initialize...")
+    for _ in range(15):
+        if is_server_ready("http://localhost:8501"):
+            break
+        time.sleep(0.5)
+
+    # Open browser now that server is confirmed alive
+    try:
+        webbrowser.open("http://localhost:8501")
+    except Exception:
+        pass
+
+    print("\n" + "=" * 65)
+    print("  SUCCESS: System is running live!")
+    print("  - Streamlit Chat UI: http://localhost:8501")
+    print("  - FastAPI Docs:     http://127.0.0.1:8000/docs")
+    print("  - Health Status:    http://127.0.0.1:8000/health")
+    print("  (Press Ctrl+C in this terminal to stop both servers)")
+    print("=" * 65 + "\n")
 
     try:
-        # Open browser automatically
-        webbrowser.open("http://localhost:8501")
-        print("\n" + "=" * 65)
-        print("  System running successfully!")
-        print("  - Streamlit UI: http://localhost:8501")
-        print("  - FastAPI Docs: http://127.0.0.1:8000/docs")
-        print("  (Press Ctrl+C in this terminal to stop both servers)")
-        print("=" * 65 + "\n")
-        
-        frontend_proc = subprocess.Popen(streamlit_cmd)
         frontend_proc.wait()
     except KeyboardInterrupt:
         print("\nShutting down servers...")
